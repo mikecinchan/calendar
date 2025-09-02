@@ -7,6 +7,8 @@ class CalendarApp {
         this.filteredEvents = [];
         this.editingEventId = null;
         this.firebase = null;
+        this.viewMode = 'single'; // 'single' or 'multi'
+        this.selectedDate = null;
         this.init();
     }
 
@@ -14,6 +16,7 @@ class CalendarApp {
         // Wait for Firebase service to be available
         this.initializeFirebaseConnection();
         this.setupEventListeners();
+        this.loadCalendarState();
         this.renderCalendar();
         this.updateMonthDisplay();
         this.loadEvents();
@@ -83,18 +86,44 @@ class CalendarApp {
     }
 
     setupEventListeners() {
+        // Navigation controls
         document.getElementById('prevMonth').addEventListener('click', () => {
             this.currentDate.setMonth(this.currentDate.getMonth() - 1);
-            this.renderCalendar();
-            this.updateMonthDisplay();
+            this.refreshCalendar();
         });
 
         document.getElementById('nextMonth').addEventListener('click', () => {
             this.currentDate.setMonth(this.currentDate.getMonth() + 1);
-            this.renderCalendar();
-            this.updateMonthDisplay();
+            this.refreshCalendar();
         });
 
+        document.getElementById('todayBtn').addEventListener('click', () => {
+            this.goToToday();
+        });
+
+        // View controls
+        document.getElementById('singleViewBtn').addEventListener('click', () => {
+            this.switchView('single');
+        });
+
+        document.getElementById('multiViewBtn').addEventListener('click', () => {
+            this.switchView('multi');
+        });
+
+        // Month/Year picker
+        document.getElementById('monthYearPicker').addEventListener('click', () => {
+            this.showMonthYearPicker();
+        });
+
+        document.getElementById('applyDateBtn').addEventListener('click', () => {
+            this.applyDateSelection();
+        });
+
+        document.getElementById('cancelDateBtn').addEventListener('click', () => {
+            this.hideMonthYearPicker();
+        });
+
+        // Event form controls
         document.getElementById('eventForm').addEventListener('submit', (e) => {
             e.preventDefault();
             this.handleEventSubmit();
@@ -107,15 +136,46 @@ class CalendarApp {
         document.getElementById('categoryFilter').addEventListener('change', (e) => {
             this.filterEvents(e.target.value);
         });
+
+        // Modal close on background click
+        document.getElementById('monthYearModal').addEventListener('click', (e) => {
+            if (e.target.id === 'monthYearModal') {
+                this.hideMonthYearPicker();
+            }
+        });
     }
 
     renderCalendar() {
+        if (this.viewMode === 'single') {
+            this.renderSingleCalendar();
+        } else {
+            this.renderMultiCalendar();
+        }
+    }
+
+    renderSingleCalendar() {
         const calendarGrid = document.getElementById('calendarGrid');
         calendarGrid.innerHTML = '';
 
         const year = this.currentDate.getFullYear();
         const month = this.currentDate.getMonth();
         
+        this.renderMonthGrid(calendarGrid, year, month);
+    }
+
+    renderMultiCalendar() {
+        const container = document.getElementById('multiCalendarContainer');
+        container.innerHTML = '';
+
+        // Render previous month, current month, and next month
+        for (let offset = -1; offset <= 1; offset++) {
+            const date = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + offset, 1);
+            const miniCalendar = this.createMiniCalendar(date.getFullYear(), date.getMonth());
+            container.appendChild(miniCalendar);
+        }
+    }
+
+    renderMonthGrid(container, year, month, isMini = false) {
         // Get first day of the month and number of days
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
@@ -129,32 +189,74 @@ class CalendarApp {
 
         // Add empty cells for days before the first day of the month
         for (let i = 0; i < startingDayOfWeek; i++) {
-            const dayElement = this.createDayElement('', true);
-            calendarGrid.appendChild(dayElement);
+            const dayElement = this.createDayElement('', true, false, isMini);
+            container.appendChild(dayElement);
         }
 
         // Add days of the month
         for (let day = 1; day <= daysInMonth; day++) {
             const isToday = isCurrentMonth && day === todayDate;
-            const dayElement = this.createDayElement(day, false, isToday);
+            const isSelected = this.selectedDate && 
+                this.selectedDate.getFullYear() === year && 
+                this.selectedDate.getMonth() === month && 
+                this.selectedDate.getDate() === day;
+            
+            const dayElement = this.createDayElement(day, false, isToday, isMini, isSelected);
+            
+            // Add click handler for date selection
+            dayElement.addEventListener('click', () => {
+                this.selectDate(new Date(year, month, day));
+            });
             
             // Add events for this day
             const dayEvents = this.getEventsForDate(year, month, day);
             this.renderEventsInDay(dayElement, dayEvents);
             
-            calendarGrid.appendChild(dayElement);
+            container.appendChild(dayElement);
         }
 
         // Fill remaining cells to complete the grid
-        const totalCells = calendarGrid.children.length;
+        const totalCells = container.children.length;
         const remainingCells = 42 - totalCells; // 6 rows × 7 days = 42 cells
         for (let i = 0; i < remainingCells; i++) {
-            const dayElement = this.createDayElement('', true);
-            calendarGrid.appendChild(dayElement);
+            const dayElement = this.createDayElement('', true, false, isMini);
+            container.appendChild(dayElement);
         }
     }
 
-    createDayElement(dayNumber, isOtherMonth = false, isToday = false) {
+    createMiniCalendar(year, month) {
+        const miniCalendar = document.createElement('div');
+        miniCalendar.className = 'mini-calendar';
+
+        // Month title
+        const monthTitle = document.createElement('div');
+        monthTitle.className = 'month-title';
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+        monthTitle.textContent = `${monthNames[month]} ${year}`;
+        miniCalendar.appendChild(monthTitle);
+
+        // Day headers
+        const header = document.createElement('div');
+        header.className = 'calendar-header';
+        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+            const dayName = document.createElement('div');
+            dayName.className = 'day-name';
+            dayName.textContent = day;
+            header.appendChild(dayName);
+        });
+        miniCalendar.appendChild(header);
+
+        // Calendar grid
+        const grid = document.createElement('div');
+        grid.className = 'calendar-grid';
+        this.renderMonthGrid(grid, year, month, true);
+        miniCalendar.appendChild(grid);
+
+        return miniCalendar;
+    }
+
+    createDayElement(dayNumber, isOtherMonth = false, isToday = false, isMini = false, isSelected = false) {
         const dayElement = document.createElement('div');
         dayElement.className = 'calendar-day';
         
@@ -164,6 +266,10 @@ class CalendarApp {
         
         if (isToday) {
             dayElement.classList.add('today');
+        }
+
+        if (isSelected) {
+            dayElement.classList.add('selected');
         }
 
         if (dayNumber) {
@@ -180,15 +286,105 @@ class CalendarApp {
         return dayElement;
     }
 
+    // New methods for enhanced functionality
+    switchView(viewMode) {
+        this.viewMode = viewMode;
+        
+        // Update button states
+        document.getElementById('singleViewBtn').classList.toggle('active', viewMode === 'single');
+        document.getElementById('multiViewBtn').classList.toggle('active', viewMode === 'multi');
+        
+        // Update calendar view visibility
+        document.getElementById('singleCalendarView').classList.toggle('active', viewMode === 'single');
+        document.getElementById('multiCalendarView').classList.toggle('active', viewMode === 'multi');
+        
+        // Re-render calendar in new view mode
+        this.renderCalendar();
+    }
+
+    goToToday() {
+        this.currentDate = new Date();
+        this.selectedDate = new Date();
+        this.refreshCalendar();
+    }
+
+    selectDate(date) {
+        this.selectedDate = date;
+        
+        // Auto-fill event form with selected date
+        const dateString = date.toISOString().split('T')[0];
+        document.getElementById('eventDate').value = dateString;
+        
+        // Re-render to show selection
+        this.renderCalendar();
+    }
+
+    showMonthYearPicker() {
+        const modal = document.getElementById('monthYearModal');
+        const monthSelect = document.getElementById('monthSelect');
+        const yearInput = document.getElementById('yearInput');
+        
+        // Set current values
+        monthSelect.value = this.currentDate.getMonth();
+        yearInput.value = this.currentDate.getFullYear();
+        
+        modal.classList.add('show');
+    }
+
+    hideMonthYearPicker() {
+        const modal = document.getElementById('monthYearModal');
+        modal.classList.remove('show');
+    }
+
+    applyDateSelection() {
+        const monthSelect = document.getElementById('monthSelect');
+        const yearInput = document.getElementById('yearInput');
+        
+        const newMonth = parseInt(monthSelect.value);
+        const newYear = parseInt(yearInput.value);
+        
+        this.currentDate = new Date(newYear, newMonth, 1);
+        this.renderCalendar();
+        this.updateMonthDisplay();
+        this.hideMonthYearPicker();
+    }
+
     renderEventsInDay(dayElement, events) {
         const eventsContainer = dayElement.querySelector('.events-container');
         if (!eventsContainer) return;
 
-        events.forEach(event => {
+        // Limit events displayed and show count if more
+        const maxEvents = dayElement.classList.contains('mini-calendar') ? 2 : 3;
+        const eventsToShow = events.slice(0, maxEvents);
+        const remainingCount = events.length - maxEvents;
+
+        eventsToShow.forEach(event => {
             const eventElement = document.createElement('div');
-            eventElement.className = `event-item event-${event.category}`;
+            let className = `event-item event-${event.category}`;
+            
+            // Add visual indicators
+            if (event.time) {
+                className += ' has-time';
+            }
+            if (event.isRecurring) {
+                className += ' recurring';
+            }
+            
+            eventElement.className = className;
             eventElement.textContent = event.title;
-            eventElement.title = `${event.title}${event.time ? ` at ${event.time}` : ''}${event.description ? `\n${event.description}` : ''}`;
+            
+            // Enhanced tooltip
+            let tooltipText = event.title;
+            if (event.time) {
+                tooltipText += `\n🕐 ${event.time}`;
+            }
+            if (event.description) {
+                tooltipText += `\n📝 ${event.description}`;
+            }
+            if (event.isRecurring) {
+                tooltipText += `\n🔁 Recurring annually`;
+            }
+            eventElement.title = tooltipText;
             
             // Add click handlers for edit and delete
             eventElement.addEventListener('click', (e) => {
@@ -198,6 +394,15 @@ class CalendarApp {
             
             eventsContainer.appendChild(eventElement);
         });
+
+        // Show "more events" indicator if needed
+        if (remainingCount > 0) {
+            const moreElement = document.createElement('div');
+            moreElement.className = 'more-events';
+            moreElement.textContent = `+${remainingCount} more`;
+            moreElement.title = `${remainingCount} additional event${remainingCount > 1 ? 's' : ''}`;
+            eventsContainer.appendChild(moreElement);
+        }
     }
 
     updateMonthDisplay() {
@@ -516,7 +721,60 @@ class CalendarApp {
 
     getEventsForDate(year, month, day) {
         const targetDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        return this.events.filter(event => event.date === targetDate);
+        
+        // Apply current filter if active
+        let eventsToShow = this.events;
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        if (categoryFilter) {
+            eventsToShow = this.events.filter(event => event.category === categoryFilter);
+        }
+        
+        return eventsToShow.filter(event => event.date === targetDate);
+    }
+
+    // Enhanced state management
+    saveCalendarState() {
+        const state = {
+            currentDate: this.currentDate.toISOString(),
+            viewMode: this.viewMode,
+            selectedDate: this.selectedDate?.toISOString() || null,
+            categoryFilter: document.getElementById('categoryFilter').value
+        };
+        localStorage.setItem('calendarState', JSON.stringify(state));
+    }
+
+    loadCalendarState() {
+        const savedState = localStorage.getItem('calendarState');
+        if (savedState) {
+            const state = JSON.parse(savedState);
+            
+            // Restore current date
+            if (state.currentDate) {
+                this.currentDate = new Date(state.currentDate);
+            }
+            
+            // Restore view mode
+            if (state.viewMode) {
+                this.switchView(state.viewMode);
+            }
+            
+            // Restore selected date
+            if (state.selectedDate) {
+                this.selectedDate = new Date(state.selectedDate);
+            }
+            
+            // Restore category filter
+            if (state.categoryFilter) {
+                document.getElementById('categoryFilter').value = state.categoryFilter;
+            }
+        }
+    }
+
+    // Enhanced calendar refresh with state preservation
+    refreshCalendar() {
+        this.renderCalendar();
+        this.updateMonthDisplay();
+        this.saveCalendarState();
     }
 
     filterEvents(category) {

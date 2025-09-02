@@ -11,24 +11,70 @@
         <header class="app-header">
             <h1>My Calendar</h1>
             <div class="controls">
-                <button id="prevMonth" class="nav-btn">&lt;</button>
-                <span id="currentMonth" class="month-display"></span>
-                <button id="nextMonth" class="nav-btn">&gt;</button>
+                <div class="view-controls">
+                    <button id="singleViewBtn" class="view-btn active">Single Month</button>
+                    <button id="multiViewBtn" class="view-btn">3 Months</button>
+                </div>
+                <div class="nav-controls">
+                    <button id="prevMonth" class="nav-btn">&lt;</button>
+                    <div class="month-year-selector">
+                        <span id="currentMonth" class="month-display"></span>
+                        <button id="monthYearPicker" class="picker-btn">▼</button>
+                    </div>
+                    <button id="nextMonth" class="nav-btn">&gt;</button>
+                    <button id="todayBtn" class="today-btn">Today</button>
+                </div>
             </div>
         </header>
 
         <main class="calendar-container">
-            <div class="calendar-header">
-                <div class="day-name">Sun</div>
-                <div class="day-name">Mon</div>
-                <div class="day-name">Tue</div>
-                <div class="day-name">Wed</div>
-                <div class="day-name">Thu</div>
-                <div class="day-name">Fri</div>
-                <div class="day-name">Sat</div>
+            <div id="singleCalendarView" class="calendar-view active">
+                <div class="calendar-header">
+                    <div class="day-name">Sun</div>
+                    <div class="day-name">Mon</div>
+                    <div class="day-name">Tue</div>
+                    <div class="day-name">Wed</div>
+                    <div class="day-name">Thu</div>
+                    <div class="day-name">Fri</div>
+                    <div class="day-name">Sat</div>
+                </div>
+                <div id="calendarGrid" class="calendar-grid">
+                    <!-- Calendar days will be generated here -->
+                </div>
             </div>
-            <div id="calendarGrid" class="calendar-grid">
-                <!-- Calendar days will be generated here -->
+            
+            <div id="multiCalendarView" class="calendar-view multi-view">
+                <div id="multiCalendarContainer" class="multi-calendar-container">
+                    <!-- Multiple calendar grids will be generated here -->
+                </div>
+            </div>
+
+            <!-- Month/Year Picker Modal -->
+            <div id="monthYearModal" class="modal">
+                <div class="modal-content">
+                    <h3>Select Month & Year</h3>
+                    <div class="picker-controls">
+                        <select id="monthSelect">
+                            <option value="0">January</option>
+                            <option value="1">February</option>
+                            <option value="2">March</option>
+                            <option value="3">April</option>
+                            <option value="4">May</option>
+                            <option value="5">June</option>
+                            <option value="6">July</option>
+                            <option value="7">August</option>
+                            <option value="8">September</option>
+                            <option value="9">October</option>
+                            <option value="10">November</option>
+                            <option value="11">December</option>
+                        </select>
+                        <input type="number" id="yearInput" min="2020" max="2030" step="1">
+                    </div>
+                    <div class="modal-buttons">
+                        <button id="applyDateBtn" class="apply-btn">Apply</button>
+                        <button id="cancelDateBtn" class="cancel-btn">Cancel</button>
+                    </div>
+                </div>
             </div>
         </main>
 
