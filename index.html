@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Calendar</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>My Calendar</h1>
+            <div class="controls">
+                <button id="prevMonth" class="nav-btn">&lt;</button>
+                <span id="currentMonth" class="month-display"></span>
+                <button id="nextMonth" class="nav-btn">&gt;</button>
+            </div>
+        </header>
+
+        <main class="calendar-container">
+            <div class="calendar-header">
+                <div class="day-name">Sun</div>
+                <div class="day-name">Mon</div>
+                <div class="day-name">Tue</div>
+                <div class="day-name">Wed</div>
+                <div class="day-name">Thu</div>
+                <div class="day-name">Fri</div>
+                <div class="day-name">Sat</div>
+            </div>
+            <div id="calendarGrid" class="calendar-grid">
+                <!-- Calendar days will be generated here -->
+            </div>
+        </main>
+
+        <aside class="sidebar">
+            <div class="event-form">
+                <h3>Add Event</h3>
+                <form id="eventForm">
+                    <input type="text" id="eventTitle" placeholder="Event Title" required>
+                    <input type="date" id="eventDate" required>
+                    <select id="eventCategory" required>
+                        <option value="">Select Category</option>
+                        <option value="birthday">Birthday</option>
+                        <option value="special">Special Occasion</option>
+                        <option value="holiday">Holiday</option>
+                        <option value="personal">Personal</option>
+                        <option value="event">Event</option>
+                    </select>
+                    <input type="time" id="eventTime">
+                    <textarea id="eventDescription" placeholder="Description (optional)"></textarea>
+                    <button type="submit">Add Event</button>
+                </form>
+            </div>
+
+            <div class="filters">
+                <h3>Filters</h3>
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="birthday">Birthday</option>
+                    <option value="special">Special Occasion</option>
+                    <option value="holiday">Holiday</option>
+                    <option value="personal">Personal</option>
+                    <option value="event">Event</option>
+                </select>
+            </div>
+        </aside>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
