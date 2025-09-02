@@ -311,8 +311,12 @@ class CalendarApp {
     selectDate(date) {
         this.selectedDate = date;
         
-        // Auto-fill event form with selected date
-        const dateString = date.toISOString().split('T')[0];
+        // Auto-fill event form with selected date (fix timezone issue)
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${day}`;
+        
         document.getElementById('eventDate').value = dateString;
         
         // Re-render to show selection
