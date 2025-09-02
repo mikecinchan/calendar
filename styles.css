@@ -108,6 +108,8 @@ body {
     cursor: pointer;
     transition: background-color 0.3s ease;
     position: relative;
+    width: 100%;
+    overflow: hidden;
 }
 
 .calendar-day:hover {
@@ -134,6 +136,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .event-item {
@@ -144,27 +148,31 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
 }
 
 /* Category colors */
 .event-birthday { 
-    background-color: #ff4081; 
+    background-color: #ff4081 !important; 
     color: #ffffff;
 }
 .event-special { 
-    background-color: #9c27b0; 
+    background-color: #9c27b0 !important; 
     color: #ffffff;
 }
 .event-holiday { 
-    background-color: #f44336; 
+    background-color: #f44336 !important; 
     color: #ffffff;
 }
 .event-personal { 
-    background-color: #4caf50; 
+    background-color: #4caf50 !important; 
     color: #ffffff;
 }
 .event-event { 
-    background-color: #ff9800; 
+    background-color: #ff9800 !important; 
     color: #ffffff;
 }
 
