@@ -121,24 +121,55 @@
 
             <div class="filters">
                 <h3>Filters</h3>
-                <select id="categoryFilter">
-                    <option value="">All Categories</option>
-                    <option value="birthday" class="category-birthday">
-                        <span class="category-indicator"></span>🎂 Birthday
-                    </option>
-                    <option value="special" class="category-special">
-                        <span class="category-indicator"></span>✨ Special Occasion
-                    </option>
-                    <option value="holiday" class="category-holiday">
-                        <span class="category-indicator"></span>🎉 Holiday
-                    </option>
-                    <option value="personal" class="category-personal">
-                        <span class="category-indicator"></span>👤 Personal
-                    </option>
-                    <option value="event" class="category-event">
-                        <span class="category-indicator"></span>📅 Event
-                    </option>
-                </select>
+                
+                <!-- Category Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Category Filter</label>
+                    <select id="categoryFilter">
+                        <option value="">All Categories</option>
+                        <option value="birthday" class="category-birthday">🎂 Birthday</option>
+                        <option value="special" class="category-special">✨ Special Occasion</option>
+                        <option value="holiday" class="category-holiday">🎉 Holiday</option>
+                        <option value="personal" class="category-personal">👤 Personal</option>
+                        <option value="event" class="category-event">📅 Event</option>
+                    </select>
+                    <button id="clearCategoryFilter" class="clear-filter-btn" style="display: none;">Clear</button>
+                </div>
+
+                <!-- Date Range Filter -->
+                <div class="filter-group">
+                    <label class="filter-label">Date Range Filter</label>
+                    <div class="date-range-controls">
+                        <select id="dateRangePreset">
+                            <option value="">Custom Range</option>
+                            <option value="thisMonth">This Month</option>
+                            <option value="nextMonth">Next Month</option>
+                            <option value="thisYear">This Year</option>
+                            <option value="next3Months">Next 3 Months</option>
+                        </select>
+                        <div class="custom-date-range">
+                            <input type="date" id="dateRangeStart" placeholder="Start Date">
+                            <input type="date" id="dateRangeEnd" placeholder="End Date">
+                        </div>
+                        <button id="clearDateRangeFilter" class="clear-filter-btn" style="display: none;">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Search -->
+                <div class="filter-group">
+                    <label class="filter-label">Search Events</label>
+                    <div class="search-controls">
+                        <input type="text" id="searchInput" placeholder="Search title or description...">
+                        <button id="clearSearch" class="clear-filter-btn" style="display: none;">×</button>
+                    </div>
+                </div>
+
+                <!-- Active Filters Display -->
+                <div id="activeFilters" class="active-filters" style="display: none;">
+                    <h4>Active Filters:</h4>
+                    <div id="activeFiltersList" class="active-filters-list"></div>
+                    <button id="clearAllFilters" class="clear-all-btn">Clear All Filters</button>
+                </div>
             </div>
         </aside>
     </div>

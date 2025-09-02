@@ -6,6 +6,11 @@ class CalendarApp {
         this.events = [];
         this.filteredEvents = [];
         this.editingEventId = null;
+        this.activeFilters = {
+            category: '',
+            dateRange: { start: null, end: null, preset: '' },
+            search: ''
+        };
         this.firebase = null;
         this.viewMode = 'single'; // 'single' or 'multi'
         this.selectedDate = null;
@@ -133,8 +138,41 @@ class CalendarApp {
             this.cancelEdit();
         });
 
+        // Enhanced filter controls
         document.getElementById('categoryFilter').addEventListener('change', (e) => {
-            this.filterEvents(e.target.value);
+            this.updateCategoryFilter(e.target.value);
+        });
+
+        document.getElementById('clearCategoryFilter').addEventListener('click', () => {
+            this.clearCategoryFilter();
+        });
+
+        document.getElementById('dateRangePreset').addEventListener('change', (e) => {
+            this.updateDateRangePreset(e.target.value);
+        });
+
+        document.getElementById('dateRangeStart').addEventListener('change', (e) => {
+            this.updateCustomDateRange();
+        });
+
+        document.getElementById('dateRangeEnd').addEventListener('change', (e) => {
+            this.updateCustomDateRange();
+        });
+
+        document.getElementById('clearDateRangeFilter').addEventListener('click', () => {
+            this.clearDateRangeFilter();
+        });
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            this.updateSearchFilter(e.target.value);
+        });
+
+        document.getElementById('clearSearch').addEventListener('click', () => {
+            this.clearSearchFilter();
+        });
+
+        document.getElementById('clearAllFilters').addEventListener('click', () => {
+            this.clearAllFilters();
         });
 
         // Modal close on background click
@@ -460,27 +498,37 @@ class CalendarApp {
     }
 
     async createEvent(eventData) {
-        // Always add to local events first for immediate UI feedback
-        this.events.push(eventData);
+        // Handle recurring events - generate multiple instances
+        const eventsToAdd = [];
+        if (eventData.isRecurring && eventData.recurrenceType === 'annual') {
+            eventsToAdd.push(...this.generateRecurringEvents(eventData));
+        } else {
+            eventsToAdd.push(eventData);
+        }
+
+        // Add all events to local storage
+        this.events.push(...eventsToAdd);
         this.saveEventsToLocalStorage();
         this.renderCalendar();
         this.clearForm();
-        this.showSuccessMessage('Event created successfully!');
+        this.showSuccessMessage(`Event${eventsToAdd.length > 1 ? 's' : ''} created successfully!`);
 
         // Then try to sync with Firebase in background
         if (this.firebase && this.firebase.isInitialized()) {
             try {
-                console.log('Attempting to save event to Firebase:', eventData);
-                const firebaseId = await this.firebase.saveEvent(eventData);
-                if (firebaseId) {
-                    console.log('Event saved to Firebase with ID:', firebaseId);
-                    // Update the event in our local array with the Firebase ID
-                    const eventIndex = this.events.findIndex(e => e.id === eventData.id);
-                    if (eventIndex >= 0) {
-                        this.events[eventIndex].firebaseId = firebaseId;
-                        this.saveEventsToLocalStorage();
+                for (const event of eventsToAdd) {
+                    console.log('Attempting to save event to Firebase:', event);
+                    const firebaseId = await this.firebase.saveEvent(event);
+                    if (firebaseId) {
+                        console.log('Event saved to Firebase with ID:', firebaseId);
+                        // Update the event in our local array with the Firebase ID
+                        const eventIndex = this.events.findIndex(e => e.id === event.id);
+                        if (eventIndex >= 0) {
+                            this.events[eventIndex].firebaseId = firebaseId;
+                        }
                     }
                 }
+                this.saveEventsToLocalStorage();
             } catch (error) {
                 console.error('Failed to save to Firebase:', error);
                 // Show error message to user
@@ -794,14 +842,10 @@ class CalendarApp {
     getEventsForDate(year, month, day) {
         const targetDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
-        // Apply current filter if active
-        let eventsToShow = this.events;
-        const categoryFilter = document.getElementById('categoryFilter').value;
-        if (categoryFilter) {
-            eventsToShow = this.events.filter(event => event.category === categoryFilter);
-        }
+        // Apply all active filters
+        const filteredEvents = this.applyAllFilters(this.events);
         
-        return eventsToShow.filter(event => event.date === targetDate);
+        return filteredEvents.filter(event => event.date === targetDate);
     }
 
     // Enhanced state management
@@ -849,13 +893,269 @@ class CalendarApp {
         this.saveCalendarState();
     }
 
-    filterEvents(category) {
-        if (!category) {
-            this.filteredEvents = [...this.events];
-        } else {
-            this.filteredEvents = this.events.filter(event => event.category === category);
-        }
+    // Enhanced filtering system
+    updateCategoryFilter(category) {
+        this.activeFilters.category = category;
+        this.updateFilterUI();
         this.renderCalendar();
+    }
+
+    clearCategoryFilter() {
+        this.activeFilters.category = '';
+        document.getElementById('categoryFilter').value = '';
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    updateDateRangePreset(preset) {
+        this.activeFilters.dateRange.preset = preset;
+        
+        if (preset) {
+            const ranges = this.getPresetDateRange(preset);
+            this.activeFilters.dateRange.start = ranges.start;
+            this.activeFilters.dateRange.end = ranges.end;
+            
+            // Update custom date inputs
+            document.getElementById('dateRangeStart').value = this.formatDateForInput(ranges.start);
+            document.getElementById('dateRangeEnd').value = this.formatDateForInput(ranges.end);
+        } else {
+            // Clear custom dates when switching to custom
+            this.activeFilters.dateRange.start = null;
+            this.activeFilters.dateRange.end = null;
+        }
+        
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    updateCustomDateRange() {
+        const startInput = document.getElementById('dateRangeStart');
+        const endInput = document.getElementById('dateRangeEnd');
+        
+        // Clear preset when using custom dates
+        document.getElementById('dateRangePreset').value = '';
+        this.activeFilters.dateRange.preset = '';
+        
+        this.activeFilters.dateRange.start = startInput.value ? new Date(startInput.value) : null;
+        this.activeFilters.dateRange.end = endInput.value ? new Date(endInput.value) : null;
+        
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    clearDateRangeFilter() {
+        this.activeFilters.dateRange = { start: null, end: null, preset: '' };
+        document.getElementById('dateRangePreset').value = '';
+        document.getElementById('dateRangeStart').value = '';
+        document.getElementById('dateRangeEnd').value = '';
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    updateSearchFilter(searchTerm) {
+        this.activeFilters.search = searchTerm.trim();
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    clearSearchFilter() {
+        this.activeFilters.search = '';
+        document.getElementById('searchInput').value = '';
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    clearAllFilters() {
+        this.activeFilters = {
+            category: '',
+            dateRange: { start: null, end: null, preset: '' },
+            search: ''
+        };
+        
+        // Clear UI elements
+        document.getElementById('categoryFilter').value = '';
+        document.getElementById('dateRangePreset').value = '';
+        document.getElementById('dateRangeStart').value = '';
+        document.getElementById('dateRangeEnd').value = '';
+        document.getElementById('searchInput').value = '';
+        
+        this.updateFilterUI();
+        this.renderCalendar();
+    }
+
+    applyAllFilters(events) {
+        let filtered = [...events];
+        
+        // Apply category filter
+        if (this.activeFilters.category) {
+            filtered = filtered.filter(event => event.category === this.activeFilters.category);
+        }
+        
+        // Apply date range filter
+        if (this.activeFilters.dateRange.start || this.activeFilters.dateRange.end) {
+            filtered = filtered.filter(event => {
+                const eventDate = new Date(event.date);
+                let inRange = true;
+                
+                if (this.activeFilters.dateRange.start) {
+                    inRange = inRange && eventDate >= this.activeFilters.dateRange.start;
+                }
+                
+                if (this.activeFilters.dateRange.end) {
+                    inRange = inRange && eventDate <= this.activeFilters.dateRange.end;
+                }
+                
+                return inRange;
+            });
+        }
+        
+        // Apply search filter
+        if (this.activeFilters.search) {
+            const searchLower = this.activeFilters.search.toLowerCase();
+            filtered = filtered.filter(event => {
+                return event.title.toLowerCase().includes(searchLower) ||
+                       (event.description && event.description.toLowerCase().includes(searchLower));
+            });
+        }
+        
+        return filtered;
+    }
+
+    updateFilterUI() {
+        // Update clear button visibility
+        document.getElementById('clearCategoryFilter').style.display = 
+            this.activeFilters.category ? 'inline-block' : 'none';
+        
+        document.getElementById('clearDateRangeFilter').style.display = 
+            (this.activeFilters.dateRange.start || this.activeFilters.dateRange.end) ? 'inline-block' : 'none';
+        
+        document.getElementById('clearSearch').style.display = 
+            this.activeFilters.search ? 'inline-block' : 'none';
+        
+        // Update active filters display
+        this.updateActiveFiltersDisplay();
+    }
+
+    updateActiveFiltersDisplay() {
+        const activeFiltersContainer = document.getElementById('activeFilters');
+        const activeFiltersList = document.getElementById('activeFiltersList');
+        
+        const activeFilters = [];
+        
+        if (this.activeFilters.category) {
+            const categoryName = this.getCategoryDisplayName(this.activeFilters.category);
+            activeFilters.push(`Category: ${categoryName}`);
+        }
+        
+        if (this.activeFilters.dateRange.preset) {
+            activeFilters.push(`Date Range: ${this.getPresetDisplayName(this.activeFilters.dateRange.preset)}`);
+        } else if (this.activeFilters.dateRange.start || this.activeFilters.dateRange.end) {
+            const start = this.activeFilters.dateRange.start ? this.formatDateForDisplay(this.activeFilters.dateRange.start) : 'Start';
+            const end = this.activeFilters.dateRange.end ? this.formatDateForDisplay(this.activeFilters.dateRange.end) : 'End';
+            activeFilters.push(`Date Range: ${start} - ${end}`);
+        }
+        
+        if (this.activeFilters.search) {
+            activeFilters.push(`Search: "${this.activeFilters.search}"`);
+        }
+        
+        if (activeFilters.length > 0) {
+            activeFiltersList.innerHTML = activeFilters.map(filter => `<span class="filter-tag">${filter}</span>`).join('');
+            activeFiltersContainer.style.display = 'block';
+        } else {
+            activeFiltersContainer.style.display = 'none';
+        }
+    }
+
+    getPresetDateRange(preset) {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        
+        switch (preset) {
+            case 'thisMonth':
+                return {
+                    start: new Date(currentYear, currentMonth, 1),
+                    end: new Date(currentYear, currentMonth + 1, 0)
+                };
+            case 'nextMonth':
+                return {
+                    start: new Date(currentYear, currentMonth + 1, 1),
+                    end: new Date(currentYear, currentMonth + 2, 0)
+                };
+            case 'thisYear':
+                return {
+                    start: new Date(currentYear, 0, 1),
+                    end: new Date(currentYear, 11, 31)
+                };
+            case 'next3Months':
+                return {
+                    start: new Date(currentYear, currentMonth, 1),
+                    end: new Date(currentYear, currentMonth + 3, 0)
+                };
+            default:
+                return { start: null, end: null };
+        }
+    }
+
+    getCategoryDisplayName(category) {
+        const categories = {
+            'birthday': '🎂 Birthday',
+            'special': '✨ Special Occasion',
+            'holiday': '🎉 Holiday',
+            'personal': '👤 Personal',
+            'event': '📅 Event'
+        };
+        return categories[category] || category;
+    }
+
+    getPresetDisplayName(preset) {
+        const presets = {
+            'thisMonth': 'This Month',
+            'nextMonth': 'Next Month',
+            'thisYear': 'This Year',
+            'next3Months': 'Next 3 Months'
+        };
+        return presets[preset] || preset;
+    }
+
+    formatDateForInput(date) {
+        if (!date) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    formatDateForDisplay(date) {
+        if (!date) return '';
+        return date.toLocaleDateString();
+    }
+
+    generateRecurringEvents(baseEvent) {
+        const events = [];
+        const baseDate = new Date(baseEvent.date);
+        const currentYear = new Date().getFullYear();
+        
+        // Generate events for current year + next 4 years (5 years total)
+        for (let yearOffset = 0; yearOffset < 5; yearOffset++) {
+            const recurringDate = new Date(baseDate);
+            recurringDate.setFullYear(currentYear + yearOffset);
+            
+            const recurringEvent = {
+                ...baseEvent,
+                id: this.generateId(),
+                date: this.formatDateForInput(recurringDate),
+                title: baseEvent.title + (yearOffset > 0 ? ` (${currentYear + yearOffset})` : ''),
+                isRecurring: true,
+                parentEventId: baseEvent.id,
+                createdAt: new Date().toISOString()
+            };
+            
+            events.push(recurringEvent);
+        }
+        
+        return events;
     }
 
     saveEventsToLocalStorage() {

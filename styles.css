@@ -490,8 +490,29 @@ body {
     background-color: #888 !important;
 }
 
-/* Filters */
-.filters select {
+/* Enhanced Filters */
+.filters {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-label {
+    color: #c5cae9;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.filters select,
+.filters input[type="date"],
+.filters input[type="text"] {
     width: 100%;
     padding: 12px;
     border: 1px solid #5c6bc0;
@@ -499,7 +520,138 @@ body {
     background-color: #3f51b5;
     color: #ffffff;
     font-size: 14px;
+}
+
+.filters select {
     cursor: pointer;
+}
+
+.filters input[type="text"]::placeholder {
+    color: #c5cae9;
+    opacity: 0.8;
+}
+
+.filters input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+.clear-filter-btn {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 5px;
+    width: auto;
+    align-self: flex-start;
+}
+
+.clear-filter-btn:hover {
+    background-color: #d32f2f;
+}
+
+.date-range-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.custom-date-range {
+    display: flex;
+    gap: 10px;
+}
+
+.custom-date-range input {
+    flex: 1;
+}
+
+.search-controls {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-controls input {
+    flex: 1;
+    padding-right: 40px;
+}
+
+.search-controls .clear-filter-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: transparent;
+    color: #c5cae9;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-controls .clear-filter-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.active-filters {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+.active-filters h4 {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.active-filters-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.filter-tag {
+    background-color: #7986cb;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.clear-all-btn {
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    width: 100%;
+}
+
+.clear-all-btn:hover {
+    background-color: #f57c00;
 }
 
 /* Mobile responsive design */
@@ -548,6 +700,19 @@ body {
     .calendar-container {
         order: 3;
         padding: 15px;
+    }
+
+    .custom-date-range {
+        flex-direction: column;
+    }
+
+    .filter-tag {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+
+    .active-filters {
+        padding: 12px;
     }
 }
 
