@@ -687,22 +687,21 @@ class CalendarApp {
         // Style the buttons
         actionsMenu.querySelectorAll('button').forEach(btn => {
             btn.style.cssText = `
-                padding: 5px 10px;
+                padding: 8px 12px;
                 border: none;
                 border-radius: 3px;
                 color: white;
                 cursor: pointer;
-                font-size: 12px;
+                font-size: 14px;
+                touch-action: manipulation;
             `;
         });
 
         actionsMenu.querySelector('button:first-child').style.backgroundColor = '#7986cb';
         actionsMenu.querySelector('button:last-child').style.backgroundColor = '#f44336';
 
-        // Position menu
-        const rect = eventElement.getBoundingClientRect();
-        actionsMenu.style.left = rect.left + 'px';
-        actionsMenu.style.top = (rect.bottom + 5) + 'px';
+        // Enhanced positioning for mobile/tablet
+        this.positionEventMenu(actionsMenu, eventElement);
 
         document.body.appendChild(actionsMenu);
 
@@ -711,12 +710,81 @@ class CalendarApp {
             if (!actionsMenu.contains(e.target)) {
                 actionsMenu.remove();
                 document.removeEventListener('click', removeMenu);
+                document.removeEventListener('touchstart', removeMenu);
             }
         };
         
         setTimeout(() => {
             document.addEventListener('click', removeMenu);
+            document.addEventListener('touchstart', removeMenu);
         }, 100);
+    }
+
+    positionEventMenu(menu, eventElement) {
+        // Get viewport dimensions
+        const viewport = {
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+
+        // Get element position relative to viewport
+        const rect = eventElement.getBoundingClientRect();
+        
+        // Get scroll positions
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+        // Calculate absolute position
+        let left = rect.left + scrollLeft;
+        let top = rect.bottom + scrollTop + 5;
+
+        // Adjust for mobile viewport scaling
+        const scale = window.devicePixelRatio || 1;
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // For mobile, use a simplified approach
+            // Position relative to the calendar container instead of viewport
+            const calendarContainer = eventElement.closest('.calendar-container');
+            const containerRect = calendarContainer.getBoundingClientRect();
+            const eventRect = eventElement.getBoundingClientRect();
+            
+            // Position relative to container
+            left = (eventRect.left - containerRect.left) + scrollLeft;
+            top = (eventRect.bottom - containerRect.top) + scrollTop + 5;
+            
+            // Ensure menu stays within container bounds
+            const menuWidth = 120; // Approximate menu width
+            const containerWidth = containerRect.width;
+            
+            if (left + menuWidth > containerWidth) {
+                left = containerWidth - menuWidth - 10;
+            }
+            
+            if (left < 10) {
+                left = 10;
+            }
+        }
+
+        // Ensure menu doesn't go off-screen horizontally
+        const menuWidth = 120; // Approximate menu width
+        if (left + menuWidth > viewport.width) {
+            left = viewport.width - menuWidth - 10;
+        }
+        
+        if (left < 10) {
+            left = 10;
+        }
+
+        // Ensure menu doesn't go off-screen vertically
+        const menuHeight = 50; // Approximate menu height
+        if (top + menuHeight > viewport.height + scrollTop) {
+            // Position above the event instead
+            top = rect.top + scrollTop - menuHeight - 5;
+        }
+
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
     }
 
     generateId() {
