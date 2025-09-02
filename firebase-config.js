@@ -72,9 +72,11 @@ class FirebaseService {
             const snapshot = await this.db.collection('events').get();
             const events = [];
             snapshot.forEach(doc => {
+                const data = doc.data();
                 events.push({
-                    id: doc.id,
-                    ...doc.data()
+                    firebaseId: doc.id,
+                    id: data.id || doc.id, // Use custom ID if available, otherwise use Firebase ID
+                    ...data
                 });
             });
             console.log('Loaded', events.length, 'events from Firebase');
@@ -145,6 +147,9 @@ class FirebaseService {
 // Export Firebase service instance
 const firebaseService = new FirebaseService();
 
+// Make service globally available
+window.firebaseService = firebaseService;
+
 // Instructions for setup (displayed in console)
 console.log(`
 === Firebase Setup Instructions ===
@@ -159,5 +164,7 @@ console.log(`
 
 // Initialize Firebase when script loads
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing Firebase service...');
     firebaseService.init();
+    console.log('Firebase service available globally:', window.firebaseService);
 });

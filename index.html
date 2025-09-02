@@ -34,21 +34,42 @@
 
         <aside class="sidebar">
             <div class="event-form">
-                <h3>Add Event</h3>
+                <h3 id="formTitle">Add Event</h3>
                 <form id="eventForm">
                     <input type="text" id="eventTitle" placeholder="Event Title" required>
+                    <div class="form-error" id="titleError"></div>
+                    
                     <input type="date" id="eventDate" required>
+                    <div class="form-error" id="dateError"></div>
+                    
                     <select id="eventCategory" required>
                         <option value="">Select Category</option>
-                        <option value="birthday">Birthday</option>
-                        <option value="special">Special Occasion</option>
-                        <option value="holiday">Holiday</option>
-                        <option value="personal">Personal</option>
-                        <option value="event">Event</option>
+                        <option value="birthday">🎂 Birthday</option>
+                        <option value="special">✨ Special Occasion</option>
+                        <option value="holiday">🎉 Holiday</option>
+                        <option value="personal">👤 Personal</option>
+                        <option value="event">📅 Event</option>
                     </select>
-                    <input type="time" id="eventTime">
-                    <textarea id="eventDescription" placeholder="Description (optional)"></textarea>
-                    <button type="submit">Add Event</button>
+                    <div class="form-error" id="categoryError"></div>
+                    
+                    <input type="time" id="eventTime" placeholder="Time (optional)">
+                    
+                    <textarea id="eventDescription" placeholder="Description (optional)" rows="3"></textarea>
+                    
+                    <div class="recurring-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="isRecurring">
+                            <span class="checkmark"></span>
+                            Recurring event (annually)
+                        </label>
+                    </div>
+                    
+                    <div class="form-buttons">
+                        <button type="submit" id="submitBtn">Add Event</button>
+                        <button type="button" id="cancelBtn" class="cancel-btn" style="display: none;">Cancel</button>
+                    </div>
+                    
+                    <input type="hidden" id="editingEventId">
                 </form>
             </div>
 
@@ -56,11 +77,21 @@
                 <h3>Filters</h3>
                 <select id="categoryFilter">
                     <option value="">All Categories</option>
-                    <option value="birthday">Birthday</option>
-                    <option value="special">Special Occasion</option>
-                    <option value="holiday">Holiday</option>
-                    <option value="personal">Personal</option>
-                    <option value="event">Event</option>
+                    <option value="birthday" class="category-birthday">
+                        <span class="category-indicator"></span>🎂 Birthday
+                    </option>
+                    <option value="special" class="category-special">
+                        <span class="category-indicator"></span>✨ Special Occasion
+                    </option>
+                    <option value="holiday" class="category-holiday">
+                        <span class="category-indicator"></span>🎉 Holiday
+                    </option>
+                    <option value="personal" class="category-personal">
+                        <span class="category-indicator"></span>👤 Personal
+                    </option>
+                    <option value="event" class="category-event">
+                        <span class="category-indicator"></span>📅 Event
+                    </option>
                 </select>
             </div>
         </aside>
