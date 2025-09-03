@@ -1377,14 +1377,29 @@ class CalendarApp {
             
             let processedEvents = [...importData.events];
             
-            // Assign new IDs and clean up events
-            processedEvents = processedEvents.map(event => ({
-                ...event,
-                id: this.generateId(),
-                firebaseId: undefined, // Will be assigned when synced
-                createdAt: event.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }));
+            // Process events and handle recurring events
+            const finalEvents = [];
+            processedEvents.forEach(event => {
+                const cleanedEvent = {
+                    ...event,
+                    id: this.generateId(),
+                    firebaseId: undefined, // Will be assigned when synced
+                    createdAt: event.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    // Convert string "true"/"false" to boolean
+                    isRecurring: event.isRecurring === true || event.isRecurring === "true"
+                };
+
+                // If this is a recurring event, generate multiple instances
+                if (cleanedEvent.isRecurring && cleanedEvent.recurrenceType === 'annual') {
+                    const recurringEvents = this.generateRecurringEvents(cleanedEvent);
+                    finalEvents.push(...recurringEvents);
+                } else {
+                    finalEvents.push(cleanedEvent);
+                }
+            });
+            
+            processedEvents = finalEvents;
 
             if (selectedMode === 'replace') {
                 // Clear existing events
