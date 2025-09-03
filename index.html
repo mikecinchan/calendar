@@ -170,6 +170,42 @@
                     <div id="activeFiltersList" class="active-filters-list"></div>
                     <button id="clearAllFilters" class="clear-all-btn">Clear All Filters</button>
                 </div>
+
+                <!-- Data Management -->
+                <div class="data-management">
+                    <h3>Data Management</h3>
+                    
+                    <!-- Import/Export -->
+                    <div class="data-group">
+                        <label class="data-label">Import/Export Events</label>
+                        <div class="data-controls">
+                            <button id="exportEventsBtn" class="data-btn export-btn">📤 Export Events</button>
+                            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+                            <button id="importEventsBtn" class="data-btn import-btn">📥 Import Events</button>
+                        </div>
+                    </div>
+
+                    <!-- Backup/Restore -->
+                    <div class="data-group">
+                        <label class="data-label">Backup & Restore</label>
+                        <div class="data-controls">
+                            <button id="createBackupBtn" class="data-btn backup-btn">💾 Create Backup</button>
+                            <button id="restoreBackupBtn" class="data-btn restore-btn">🔄 Restore Backup</button>
+                        </div>
+                        <div class="backup-info">
+                            <small id="lastBackupInfo">No backup available</small>
+                        </div>
+                    </div>
+
+                    <!-- Sync Status -->
+                    <div class="data-group">
+                        <label class="data-label">Sync Status</label>
+                        <div class="sync-status">
+                            <div id="syncStatusIndicator" class="sync-indicator">🔄 Checking...</div>
+                            <button id="forceSyncBtn" class="data-btn sync-btn">🔄 Force Sync</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
     </div>

@@ -12,6 +12,8 @@ class CalendarApp {
             search: ''
         };
         this.firebase = null;
+        this.eventCache = new Map();
+        this.lastCacheUpdate = null;
         this.viewMode = 'single'; // 'single' or 'multi'
         this.selectedDate = null;
         this.init();
@@ -26,6 +28,11 @@ class CalendarApp {
         this.updateMonthDisplay();
         this.loadEvents();
         this.setupDebugTools();
+        
+        // Initialize data management features
+        setTimeout(() => {
+            this.initializeSyncStatus();
+        }, 1000); // Wait for Firebase to initialize
     }
 
     async initializeFirebaseConnection() {
@@ -175,6 +182,31 @@ class CalendarApp {
             this.clearAllFilters();
         });
 
+        // Data management controls
+        document.getElementById('exportEventsBtn').addEventListener('click', () => {
+            this.exportEvents();
+        });
+
+        document.getElementById('importEventsBtn').addEventListener('click', () => {
+            document.getElementById('importFileInput').click();
+        });
+
+        document.getElementById('importFileInput').addEventListener('change', (e) => {
+            this.importEvents(e.target.files[0]);
+        });
+
+        document.getElementById('createBackupBtn').addEventListener('click', () => {
+            this.createBackup();
+        });
+
+        document.getElementById('restoreBackupBtn').addEventListener('click', () => {
+            this.restoreBackup();
+        });
+
+        document.getElementById('forceSyncBtn').addEventListener('click', () => {
+            this.forceSync();
+        });
+
         // Modal close on background click
         document.getElementById('monthYearModal').addEventListener('click', (e) => {
             if (e.target.id === 'monthYearModal') {
@@ -246,8 +278,8 @@ class CalendarApp {
                 this.selectDate(new Date(year, month, day));
             });
             
-            // Add events for this day
-            const dayEvents = this.getEventsForDate(year, month, day);
+            // Add events for this day (using cache)
+            const dayEvents = this.getCachedEventsForDate(year, month, day);
             this.renderEventsInDay(dayElement, dayEvents);
             
             container.appendChild(dayElement);
@@ -509,6 +541,8 @@ class CalendarApp {
         // Add all events to local storage
         this.events.push(...eventsToAdd);
         this.saveEventsToLocalStorage();
+        this.invalidateCache();
+        this.updateCache();
         this.renderCalendar();
         this.clearForm();
         this.showSuccessMessage(`Event${eventsToAdd.length > 1 ? 's' : ''} created successfully!`);
@@ -518,7 +552,9 @@ class CalendarApp {
             try {
                 for (const event of eventsToAdd) {
                     console.log('Attempting to save event to Firebase:', event);
-                    const firebaseId = await this.firebase.saveEvent(event);
+                    // Clean event data for Firebase
+                    const cleanEventData = this.cleanEventForFirebase(event);
+                    const firebaseId = await this.firebase.saveEvent(cleanEventData);
                     if (firebaseId) {
                         console.log('Event saved to Firebase with ID:', firebaseId);
                         // Update the event in our local array with the Firebase ID
@@ -549,7 +585,9 @@ class CalendarApp {
         // Update in Firebase if available
         if (this.firebase && this.firebase.isInitialized() && existingEvent.firebaseId) {
             try {
-                await this.firebase.updateEvent(existingEvent.firebaseId, eventData);
+                // Clean event data for Firebase
+                const cleanEventData = this.cleanEventForFirebase(eventData);
+                await this.firebase.updateEvent(existingEvent.firebaseId, cleanEventData);
             } catch (error) {
                 console.warn('Failed to update in Firebase:', error);
             }
@@ -557,34 +595,77 @@ class CalendarApp {
 
         this.events[eventIndex] = updatedEvent;
         this.saveEventsToLocalStorage();
+        this.invalidateCache();
+        this.updateCache();
         this.renderCalendar();
         this.clearForm();
         this.showSuccessMessage('Event updated successfully!');
     }
 
     async deleteEvent(eventId) {
-        if (!confirm('Are you sure you want to delete this event?')) {
-            return;
-        }
-
         const eventIndex = this.events.findIndex(e => e.id === eventId);
         if (eventIndex === -1) return;
 
         const event = this.events[eventIndex];
 
-        // Delete from Firebase if available
-        if (this.firebase && this.firebase.isInitialized() && event.firebaseId) {
-            try {
-                await this.firebase.deleteEvent(event.firebaseId);
-            } catch (error) {
-                console.warn('Failed to delete from Firebase:', error);
+        // Check if this is a recurring event
+        const isRecurringEvent = event.isRecurring || event.parentEventId;
+        let eventsToDelete = [event];
+        
+        if (isRecurringEvent) {
+            // Find all related recurring events
+            const baseTitle = event.title.replace(/ \(\d{4}\)$/, ''); // Remove year suffix if present
+            const relatedEvents = this.events.filter(e => {
+                // Match by base title and same category, or same parentEventId
+                const eventBaseTitle = e.title.replace(/ \(\d{4}\)$/, '');
+                return (eventBaseTitle === baseTitle && e.category === event.category && e.isRecurring) ||
+                       (event.parentEventId && e.parentEventId === event.parentEventId) ||
+                       (e.id === event.parentEventId) ||
+                       (event.id === e.parentEventId);
+            });
+            
+            eventsToDelete = relatedEvents.length > 0 ? relatedEvents : [event];
+            
+            // Confirm deletion of multiple events
+            const eventCount = eventsToDelete.length;
+            if (eventCount > 1) {
+                if (!confirm(`This will delete all ${eventCount} instances of "${baseTitle}". Are you sure?`)) {
+                    return;
+                }
+            } else if (!confirm('Are you sure you want to delete this event?')) {
+                return;
+            }
+        } else {
+            if (!confirm('Are you sure you want to delete this event?')) {
+                return;
             }
         }
 
-        this.events.splice(eventIndex, 1);
+        // Delete from Firebase if available
+        for (const eventToDelete of eventsToDelete) {
+            if (this.firebase && this.firebase.isInitialized() && eventToDelete.firebaseId) {
+                try {
+                    await this.firebase.deleteEvent(eventToDelete.firebaseId);
+                } catch (error) {
+                    console.warn('Failed to delete from Firebase:', error);
+                }
+            }
+        }
+
+        // Remove events from local array
+        this.events = this.events.filter(e => !eventsToDelete.some(del => del.id === e.id));
+
         this.saveEventsToLocalStorage();
+        this.invalidateCache();
+        this.updateCache();
         this.renderCalendar();
-        this.showSuccessMessage('Event deleted successfully!');
+        
+        const deletedCount = eventsToDelete.length;
+        if (deletedCount > 1) {
+            this.showSuccessMessage(`All ${deletedCount} recurring events deleted successfully!`);
+        } else {
+            this.showSuccessMessage('Event deleted successfully!');
+        }
     }
 
     validateForm() {
@@ -1156,6 +1237,550 @@ class CalendarApp {
         }
         
         return events;
+    }
+
+    // Data Management Methods
+    exportEvents() {
+        try {
+            const exportData = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                totalEvents: this.events.length,
+                events: this.events.map(event => ({
+                    ...event,
+                    // Remove internal IDs for cleaner export
+                    firebaseId: undefined
+                })).filter(event => event.firebaseId !== undefined || true) // Keep all events
+            };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0, 19).replace(/[:.]/g, '-');
+            link.download = `calendar-events-${timestamp}.json`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(link.href);
+            
+            this.showSuccessMessage(`Successfully exported ${exportData.totalEvents} events`);
+            
+        } catch (error) {
+            console.error('Export failed:', error);
+            this.showErrorMessage('Failed to export events. Please try again.');
+        }
+    }
+
+    async importEvents(file) {
+        if (!file) {
+            this.showErrorMessage('No file selected');
+            return;
+        }
+
+        if (file.type !== 'application/json') {
+            this.showErrorMessage('Please select a valid JSON file');
+            return;
+        }
+
+        try {
+            const fileContent = await this.readFileAsText(file);
+            const importData = JSON.parse(fileContent);
+            
+            // Validate import data structure
+            if (!this.validateImportData(importData)) {
+                this.showErrorMessage('Invalid file format. Please select a valid calendar export file.');
+                return;
+            }
+
+            // Show import options dialog
+            this.showImportDialog(importData);
+            
+        } catch (error) {
+            console.error('Import failed:', error);
+            if (error instanceof SyntaxError) {
+                this.showErrorMessage('Invalid JSON file. Please check the file format.');
+            } else {
+                this.showErrorMessage('Failed to import events. Please try again.');
+            }
+        }
+    }
+
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file);
+        });
+    }
+
+    validateImportData(data) {
+        if (!data || typeof data !== 'object') return false;
+        if (!data.events || !Array.isArray(data.events)) return false;
+        
+        // Validate each event has required fields
+        return data.events.every(event => 
+            event.title && 
+            event.date && 
+            event.category &&
+            typeof event.title === 'string' &&
+            typeof event.date === 'string' &&
+            typeof event.category === 'string'
+        );
+    }
+
+    showImportDialog(importData) {
+        const existingCount = this.events.length;
+        const importCount = importData.events.length;
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal show';
+        modal.innerHTML = `
+            <div class="modal-content import-dialog">
+                <h3>Import Events</h3>
+                <div class="import-info">
+                    <p><strong>Import File:</strong> ${importData.totalEvents || importCount} events</p>
+                    <p><strong>Current Calendar:</strong> ${existingCount} events</p>
+                    <p><strong>Export Date:</strong> ${importData.exportDate ? new Date(importData.exportDate).toLocaleDateString() : 'Unknown'}</p>
+                </div>
+                <div class="import-options">
+                    <label class="import-option">
+                        <input type="radio" name="importMode" value="merge" checked>
+                        <span>Merge with existing events</span>
+                    </label>
+                    <label class="import-option">
+                        <input type="radio" name="importMode" value="replace">
+                        <span>Replace all existing events</span>
+                    </label>
+                </div>
+                <div class="modal-buttons">
+                    <button class="apply-btn" onclick="calendar.processImport('${btoa(JSON.stringify(importData))}')">Import</button>
+                    <button class="cancel-btn" onclick="calendar.closeImportDialog()">Cancel</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        this.currentImportModal = modal;
+    }
+
+    async processImport(encodedData) {
+        try {
+            const importData = JSON.parse(atob(encodedData));
+            const selectedMode = document.querySelector('input[name="importMode"]:checked').value;
+            
+            let processedEvents = [...importData.events];
+            
+            // Assign new IDs and clean up events
+            processedEvents = processedEvents.map(event => ({
+                ...event,
+                id: this.generateId(),
+                firebaseId: undefined, // Will be assigned when synced
+                createdAt: event.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }));
+
+            if (selectedMode === 'replace') {
+                // Clear existing events
+                this.events = [];
+            }
+            
+            // Add imported events
+            this.events.push(...processedEvents);
+            
+            // Remove duplicates based on title + date + category
+            this.events = this.removeDuplicateEvents(this.events);
+            
+            // Save and refresh
+            this.saveEventsToLocalStorage();
+            this.renderCalendar();
+            
+            // Sync with Firebase
+            if (this.firebase && this.firebase.isInitialized()) {
+                this.syncImportedEventsToFirebase(processedEvents);
+            }
+            
+            this.closeImportDialog();
+            this.showSuccessMessage(`Successfully imported ${processedEvents.length} events`);
+            
+        } catch (error) {
+            console.error('Process import failed:', error);
+            this.showErrorMessage('Failed to process import. Please try again.');
+        }
+    }
+
+    removeDuplicateEvents(events) {
+        const seen = new Set();
+        return events.filter(event => {
+            const key = `${event.title}-${event.date}-${event.category}`;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    }
+
+    async syncImportedEventsToFirebase(events) {
+        let syncedCount = 0;
+        for (const event of events) {
+            try {
+                // Clean event data for Firebase (remove internal fields)
+                const cleanEventData = this.cleanEventForFirebase(event);
+                const firebaseId = await this.firebase.saveEvent(cleanEventData);
+                if (firebaseId) {
+                    const eventIndex = this.events.findIndex(e => e.id === event.id);
+                    if (eventIndex >= 0) {
+                        this.events[eventIndex].firebaseId = firebaseId;
+                    }
+                    syncedCount++;
+                }
+            } catch (error) {
+                console.warn('Failed to sync imported event:', event.title, error);
+            }
+        }
+        
+        if (syncedCount > 0) {
+            this.saveEventsToLocalStorage();
+            console.log(`Synced ${syncedCount}/${events.length} imported events to Firebase`);
+        }
+    }
+
+    cleanEventForFirebase(event) {
+        // Remove internal fields that shouldn't be saved to Firebase
+        const cleanEvent = { ...event };
+        delete cleanEvent.firebaseId; // Firebase generates its own ID
+        return cleanEvent;
+    }
+
+    closeImportDialog() {
+        if (this.currentImportModal) {
+            document.body.removeChild(this.currentImportModal);
+            this.currentImportModal = null;
+        }
+    }
+
+    createBackup() {
+        try {
+            const backupData = {
+                version: '1.0',
+                backupDate: new Date().toISOString(),
+                events: this.events,
+                calendarState: {
+                    currentDate: this.currentDate.toISOString(),
+                    viewMode: this.viewMode,
+                    activeFilters: this.activeFilters
+                }
+            };
+            
+            localStorage.setItem('calendarBackup', JSON.stringify(backupData));
+            
+            // Update backup info display
+            this.updateBackupInfo();
+            
+            this.showSuccessMessage('Backup created successfully');
+            
+        } catch (error) {
+            console.error('Backup failed:', error);
+            this.showErrorMessage('Failed to create backup. Please try again.');
+        }
+    }
+
+    restoreBackup() {
+        try {
+            const backupData = localStorage.getItem('calendarBackup');
+            if (!backupData) {
+                this.showErrorMessage('No backup found');
+                return;
+            }
+
+            const backup = JSON.parse(backupData);
+            
+            if (!this.validateBackupData(backup)) {
+                this.showErrorMessage('Invalid backup data');
+                return;
+            }
+
+            // Confirm restore
+            if (!confirm('This will replace all current events with the backup. Are you sure?')) {
+                return;
+            }
+
+            // Restore events
+            this.events = [...backup.events];
+            
+            // Restore calendar state if available
+            if (backup.calendarState) {
+                if (backup.calendarState.currentDate) {
+                    this.currentDate = new Date(backup.calendarState.currentDate);
+                }
+                if (backup.calendarState.viewMode) {
+                    this.switchView(backup.calendarState.viewMode);
+                }
+                if (backup.calendarState.activeFilters) {
+                    this.activeFilters = backup.calendarState.activeFilters;
+                    this.restoreFilterUI();
+                }
+            }
+
+            // Save and refresh
+            this.saveEventsToLocalStorage();
+            this.renderCalendar();
+            this.updateMonthDisplay();
+            
+            // Sync with Firebase
+            if (this.firebase && this.firebase.isInitialized()) {
+                this.syncRestoredEventsToFirebase();
+            }
+            
+            this.showSuccessMessage(`Backup restored: ${backup.events.length} events`);
+            
+        } catch (error) {
+            console.error('Restore failed:', error);
+            this.showErrorMessage('Failed to restore backup. Please try again.');
+        }
+    }
+
+    validateBackupData(backup) {
+        return backup && 
+               backup.events && 
+               Array.isArray(backup.events) &&
+               backup.events.every(event => event.title && event.date && event.category);
+    }
+
+    async syncRestoredEventsToFirebase() {
+        // This could be implemented to sync restored events to Firebase
+        // For now, we'll just log the action
+        console.log('Syncing restored events to Firebase...');
+    }
+
+    restoreFilterUI() {
+        // Restore filter UI elements
+        if (this.activeFilters.category) {
+            document.getElementById('categoryFilter').value = this.activeFilters.category;
+        }
+        if (this.activeFilters.search) {
+            document.getElementById('searchInput').value = this.activeFilters.search;
+        }
+        // Date range restoration would be more complex, skipping for now
+        
+        this.updateFilterUI();
+    }
+
+    updateBackupInfo() {
+        const backupData = localStorage.getItem('calendarBackup');
+        const infoElement = document.getElementById('lastBackupInfo');
+        
+        if (backupData) {
+            try {
+                const backup = JSON.parse(backupData);
+                const backupDate = new Date(backup.backupDate);
+                infoElement.textContent = `Last backup: ${backupDate.toLocaleString()}`;
+            } catch (error) {
+                infoElement.textContent = 'Backup data corrupted';
+            }
+        } else {
+            infoElement.textContent = 'No backup available';
+        }
+    }
+
+    async forceSync() {
+        if (!this.firebase || !this.firebase.isInitialized()) {
+            this.showErrorMessage('Firebase not available');
+            this.updateSyncStatus('error', '❌ Firebase not available');
+            return;
+        }
+
+        this.updateSyncStatus('syncing', '🔄 Syncing...');
+
+        try {
+            // Force reload from Firebase
+            const firebaseEvents = await this.firebase.loadEvents();
+            
+            // Merge with local events
+            const mergedEvents = this.mergeEvents(this.events, firebaseEvents);
+            
+            // Update local storage
+            this.events = mergedEvents;
+            this.saveEventsToLocalStorage();
+            
+            // Re-render calendar
+            this.renderCalendar();
+            
+            this.updateSyncStatus('success', `✅ Synced (${this.events.length} events)`);
+            this.showSuccessMessage('Data synchronized successfully');
+            
+        } catch (error) {
+            console.error('Force sync failed:', error);
+            this.updateSyncStatus('error', '❌ Sync failed');
+            this.showErrorMessage('Failed to synchronize data');
+        }
+    }
+
+    updateSyncStatus(status, message) {
+        const indicator = document.getElementById('syncStatusIndicator');
+        indicator.textContent = message;
+        indicator.className = `sync-indicator sync-${status}`;
+    }
+
+    // Initialize sync status on load
+    initializeSyncStatus() {
+        if (this.firebase && this.firebase.isInitialized()) {
+            this.updateSyncStatus('success', '✅ Connected');
+        } else {
+            this.updateSyncStatus('offline', '📱 Offline mode');
+        }
+        
+        // Update backup info
+        this.updateBackupInfo();
+    }
+
+    // Performance optimization methods
+    getCachedEventsForDate(year, month, day) {
+        const cacheKey = `${year}-${month}-${day}`;
+        const cached = this.eventCache.get(cacheKey);
+        
+        if (cached && this.isCacheValid()) {
+            return cached;
+        }
+        
+        const events = this.getEventsForDateUncached(year, month, day);
+        this.eventCache.set(cacheKey, events);
+        
+        return events;
+    }
+
+    getEventsForDateUncached(year, month, day) {
+        const targetDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // Apply all active filters
+        const filteredEvents = this.applyAllFilters(this.events);
+        
+        return filteredEvents.filter(event => event.date === targetDate);
+    }
+
+    isCacheValid() {
+        if (!this.lastCacheUpdate) return false;
+        
+        const cacheTimeout = 30000; // 30 seconds
+        return Date.now() - this.lastCacheUpdate < cacheTimeout;
+    }
+
+    invalidateCache() {
+        this.eventCache.clear();
+        this.lastCacheUpdate = null;
+    }
+
+    updateCache() {
+        this.lastCacheUpdate = Date.now();
+    }
+
+    // Enhanced validation with detailed error reporting
+    validateEventData(eventData) {
+        const errors = [];
+        
+        if (!eventData.title || typeof eventData.title !== 'string' || eventData.title.trim().length === 0) {
+            errors.push('Title is required and must be a non-empty string');
+        }
+        
+        if (!eventData.date || typeof eventData.date !== 'string') {
+            errors.push('Date is required and must be a valid date string');
+        } else {
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(eventData.date)) {
+                errors.push('Date must be in YYYY-MM-DD format');
+            } else {
+                const parsedDate = new Date(eventData.date);
+                if (isNaN(parsedDate.getTime())) {
+                    errors.push('Date must be a valid date');
+                }
+            }
+        }
+        
+        const validCategories = ['birthday', 'special', 'holiday', 'personal', 'event'];
+        if (!eventData.category || !validCategories.includes(eventData.category)) {
+            errors.push(`Category must be one of: ${validCategories.join(', ')}`);
+        }
+        
+        if (eventData.time && typeof eventData.time === 'string') {
+            const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!timeRegex.test(eventData.time)) {
+                errors.push('Time must be in HH:MM format (24-hour)');
+            }
+        }
+        
+        if (eventData.description && typeof eventData.description !== 'string') {
+            errors.push('Description must be a string');
+        }
+        
+        if (eventData.isRecurring !== undefined && typeof eventData.isRecurring !== 'boolean') {
+            errors.push('isRecurring must be a boolean');
+        }
+        
+        return {
+            isValid: errors.length === 0,
+            errors: errors
+        };
+    }
+
+    // Enhanced error handling with user-friendly messages
+    handleError(error, operation = 'operation') {
+        console.error(`Error during ${operation}:`, error);
+        
+        let userMessage = `An error occurred during ${operation}.`;
+        
+        if (error.name === 'QuotaExceededError') {
+            userMessage = 'Storage quota exceeded. Please clear some data and try again.';
+        } else if (error.name === 'NetworkError') {
+            userMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (error.name === 'SecurityError') {
+            userMessage = 'Security error. Please ensure you have proper permissions.';
+        } else if (error.message && error.message.includes('Firebase')) {
+            userMessage = 'Cloud sync error. Your data has been saved locally.';
+        } else if (error.message && error.message.includes('JSON')) {
+            userMessage = 'Data format error. Please check the file format and try again.';
+        }
+        
+        this.showErrorMessage(userMessage);
+        
+        return {
+            handled: true,
+            userMessage: userMessage,
+            originalError: error
+        };
+    }
+
+    // Optimized rendering with debouncing
+    debounceRender() {
+        if (this.renderTimeout) {
+            clearTimeout(this.renderTimeout);
+        }
+        
+        this.renderTimeout = setTimeout(() => {
+            this.renderCalendar();
+            this.renderTimeout = null;
+        }, 100);
+    }
+
+    // Memory management
+    cleanup() {
+        this.invalidateCache();
+        
+        if (this.renderTimeout) {
+            clearTimeout(this.renderTimeout);
+            this.renderTimeout = null;
+        }
+        
+        // Remove any event listeners that might cause memory leaks
+        document.querySelectorAll('.event-actions').forEach(menu => {
+            menu.remove();
+        });
     }
 
     saveEventsToLocalStorage() {
