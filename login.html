@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Calendar - Login</title>
+    <link rel="stylesheet" href="auth-styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1>🗓️ My Calendar</h1>
+                <p>Sign in to access your personal calendar</p>
+            </div>
+            
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required>
+                    <div class="error-message" id="emailError"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                    <div class="error-message" id="passwordError"></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" id="loginBtn" class="auth-btn primary">
+                        <span class="btn-text">Sign In</span>
+                        <div class="btn-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                        </div>
+                    </button>
+                </div>
+                
+                <div class="auth-error" id="authError" style="display: none;"></div>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Secure authentication powered by Firebase</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Firebase Config -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Authentication Script -->
+    <script src="auth.js"></script>
+</body>
+</html>

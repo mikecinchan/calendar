@@ -16,23 +16,83 @@ class CalendarApp {
         this.lastCacheUpdate = null;
         this.viewMode = 'single'; // 'single' or 'multi'
         this.selectedDate = null;
+        this.currentUser = null;
+        this.authInitialized = false;
         this.init();
     }
 
     init() {
-        // Wait for Firebase service to be available
-        this.initializeFirebaseConnection();
-        this.setupEventListeners();
-        this.loadCalendarState();
-        this.renderCalendar();
-        this.updateMonthDisplay();
-        this.loadEvents();
-        this.setupDebugTools();
-        
-        // Initialize data management features
-        setTimeout(() => {
-            this.initializeSyncStatus();
-        }, 1000); // Wait for Firebase to initialize
+        // Initialize authentication first
+        this.initializeAuthentication().then(() => {
+            // Wait for Firebase service to be available
+            this.initializeFirebaseConnection();
+            this.setupEventListeners();
+            this.loadCalendarState();
+            this.renderCalendar();
+            this.updateMonthDisplay();
+            this.loadEvents();
+            this.setupDebugTools();
+            
+            // Initialize data management features
+            setTimeout(() => {
+                this.initializeSyncStatus();
+            }, 1000); // Wait for Firebase to initialize
+        });
+    }
+
+    async initializeAuthentication() {
+        try {
+            // Wait for Firebase to be available
+            let attempts = 0;
+            while (typeof firebase === 'undefined' && attempts < 20) {
+                console.log('Waiting for Firebase SDK... attempt', attempts + 1);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (typeof firebase !== 'undefined') {
+                // Set up auth state listener
+                firebase.auth().onAuthStateChanged(user => {
+                    this.currentUser = user;
+                    if (user) {
+                        console.log('User authenticated:', user.email);
+                        this.showUserInfo(user);
+                        this.authInitialized = true;
+                    } else {
+                        console.log('User not authenticated');
+                        this.redirectToLogin();
+                    }
+                });
+            } else {
+                console.error('Firebase SDK not available');
+                this.redirectToLogin();
+            }
+        } catch (error) {
+            console.error('Authentication initialization failed:', error);
+            this.redirectToLogin();
+        }
+    }
+
+    showUserInfo(user) {
+        const userInfo = document.getElementById('userInfo');
+        const userEmail = document.getElementById('userEmail');
+        if (userInfo && userEmail) {
+            userEmail.textContent = user.email;
+            userInfo.style.display = 'block';
+        }
+    }
+
+    redirectToLogin() {
+        window.location.href = 'login.html';
+    }
+
+    async logout() {
+        try {
+            await firebase.auth().signOut();
+            console.log('User logged out successfully');
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
     }
 
     async initializeFirebaseConnection() {
@@ -205,6 +265,11 @@ class CalendarApp {
 
         document.getElementById('forceSyncBtn').addEventListener('click', () => {
             this.forceSync();
+        });
+
+        // Authentication controls
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
         });
 
         // Modal close on background click

@@ -9,7 +9,12 @@
 <body>
     <div class="app-container">
         <header class="app-header">
-            <h1>My Calendar</h1>
+            <div class="header-left">
+                <h1>My Calendar</h1>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <span id="userEmail"></span>
+                </div>
+            </div>
             <div class="controls">
                 <div class="view-controls">
                     <button id="singleViewBtn" class="view-btn active">Single Month</button>
@@ -23,6 +28,9 @@
                     </div>
                     <button id="nextMonth" class="nav-btn">&gt;</button>
                     <button id="todayBtn" class="today-btn">Today</button>
+                </div>
+                <div class="auth-controls">
+                    <button id="logoutBtn" class="logout-btn">Logout</button>
                 </div>
             </div>
         </header>
@@ -211,6 +219,7 @@
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
