@@ -115,8 +115,14 @@
                         <label class="checkbox-label">
                             <input type="checkbox" id="isRecurring">
                             <span class="checkmark"></span>
-                            Recurring event (annually)
+                            Recurring event
                         </label>
+                        <div id="recurrenceTypeContainer" class="recurrence-type" style="display: none;">
+                            <select id="recurrenceType">
+                                <option value="annual">Annually (5 years)</option>
+                                <option value="monthly">Monthly (12 months)</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <div class="form-buttons">

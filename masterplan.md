@@ -38,8 +38,9 @@
 - **Extensibility:** Additional categories can be added later
 
 ### 3. Recurring Events
-- **Annual Recurrence:** Support for yearly recurring events (especially important for birthdays)
-- **Automatic Generation:** System automatically creates recurring instances
+- **Annual Recurrence:** Support for yearly recurring events (5 consecutive years)
+- **Monthly Recurrence:** Support for monthly recurring events (12 consecutive months)
+- **Automatic Generation:** System automatically creates recurring instances based on selected type
 
 ### 4. Calendar Views
 - **Primary View:** Traditional monthly calendar layout
@@ -95,7 +96,7 @@
       "category": "Birthday|Entertainment|Holiday|Personal|Crypto|Expense",
       "description": "Optional description",
       "isRecurring": true|false,
-      "recurrenceType": "annual",
+      "recurrenceType": "annual|monthly",
       "createdAt": "timestamp",
       "updatedAt": "timestamp"
     }
@@ -109,7 +110,7 @@
 - **Deployment Phase:** GitHub Pages hosting
 
 ## Future Enhancements (Post-MVP)
-- Additional recurring patterns (monthly, weekly)
+- Additional recurring patterns (weekly, daily)
 - Calendar sharing capabilities
 - Event reminders/notifications
 - Advanced filtering options

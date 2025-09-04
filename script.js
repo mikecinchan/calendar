@@ -205,6 +205,11 @@ class CalendarApp {
             this.cancelEdit();
         });
 
+        // Recurrence type toggle
+        document.getElementById('isRecurring').addEventListener('change', (e) => {
+            this.toggleRecurrenceOptions(e.target.checked);
+        });
+
         // Enhanced filter controls
         document.getElementById('categoryFilter').addEventListener('change', (e) => {
             this.updateCategoryFilter(e.target.value);
@@ -521,7 +526,8 @@ class CalendarApp {
                 tooltipText += `\n📝 ${event.description}`;
             }
             if (event.isRecurring) {
-                tooltipText += `\n🔁 Recurring annually`;
+                const recurrenceText = event.recurrenceType === 'monthly' ? 'monthly' : 'annually';
+                tooltipText += `\n🔁 Recurring ${recurrenceText}`;
             }
             eventElement.title = tooltipText;
             
@@ -565,6 +571,7 @@ class CalendarApp {
         const time = document.getElementById('eventTime').value;
         const description = document.getElementById('eventDescription').value.trim();
         const isRecurring = document.getElementById('isRecurring').checked;
+        const recurrenceType = document.getElementById('recurrenceType').value;
         const editingId = document.getElementById('editingEventId').value;
 
         const eventData = {
@@ -574,7 +581,7 @@ class CalendarApp {
             time: time || null,
             description: description || null,
             isRecurring,
-            recurrenceType: isRecurring ? 'annual' : null,
+            recurrenceType: isRecurring ? recurrenceType : null,
             updatedAt: new Date().toISOString()
         };
 
@@ -597,7 +604,7 @@ class CalendarApp {
     async createEvent(eventData) {
         // Handle recurring events - generate multiple instances
         const eventsToAdd = [];
-        if (eventData.isRecurring && eventData.recurrenceType === 'annual') {
+        if (eventData.isRecurring && (eventData.recurrenceType === 'annual' || eventData.recurrenceType === 'monthly')) {
             eventsToAdd.push(...this.generateRecurringEvents(eventData));
         } else {
             eventsToAdd.push(eventData);
@@ -817,6 +824,15 @@ class CalendarApp {
         }, 5000); // Show error messages longer
     }
 
+    toggleRecurrenceOptions(isRecurring) {
+        const container = document.getElementById('recurrenceTypeContainer');
+        if (isRecurring) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
     clearForm() {
         document.getElementById('eventForm').reset();
         document.getElementById('editingEventId').value = '';
@@ -825,6 +841,8 @@ class CalendarApp {
         document.getElementById('cancelBtn').style.display = 'none';
         this.editingEventId = null;
         this.clearErrors();
+        // Reset recurrence options
+        this.toggleRecurrenceOptions(false);
     }
 
     editEvent(eventId) {
@@ -838,7 +856,11 @@ class CalendarApp {
         document.getElementById('eventTime').value = event.time || '';
         document.getElementById('eventDescription').value = event.description || '';
         document.getElementById('isRecurring').checked = event.isRecurring || false;
+        document.getElementById('recurrenceType').value = event.recurrenceType || 'annual';
         document.getElementById('editingEventId').value = eventId;
+        
+        // Show/hide recurrence options based on current state
+        this.toggleRecurrenceOptions(event.isRecurring || false);
 
         // Update form UI
         document.getElementById('formTitle').textContent = 'Edit Event';
@@ -1282,24 +1304,53 @@ class CalendarApp {
     generateRecurringEvents(baseEvent) {
         const events = [];
         const baseDate = new Date(baseEvent.date);
-        const currentYear = new Date().getFullYear();
         
-        // Generate events for current year + next 4 years (5 years total)
-        for (let yearOffset = 0; yearOffset < 5; yearOffset++) {
-            const recurringDate = new Date(baseDate);
-            recurringDate.setFullYear(currentYear + yearOffset);
-            
-            const recurringEvent = {
-                ...baseEvent,
-                id: this.generateId(),
-                date: this.formatDateForInput(recurringDate),
-                title: baseEvent.title + (yearOffset > 0 ? ` (${currentYear + yearOffset})` : ''),
-                isRecurring: true,
-                parentEventId: baseEvent.id,
-                createdAt: new Date().toISOString()
-            };
-            
-            events.push(recurringEvent);
+        if (baseEvent.recurrenceType === 'annual') {
+            // Generate events for current year + next 4 years (5 years total)
+            const currentYear = new Date().getFullYear();
+            for (let yearOffset = 0; yearOffset < 5; yearOffset++) {
+                const recurringDate = new Date(baseDate);
+                recurringDate.setFullYear(currentYear + yearOffset);
+                
+                const recurringEvent = {
+                    ...baseEvent,
+                    id: this.generateId(),
+                    date: this.formatDateForInput(recurringDate),
+                    title: baseEvent.title + (yearOffset > 0 ? ` (${currentYear + yearOffset})` : ''),
+                    isRecurring: true,
+                    parentEventId: baseEvent.id,
+                    createdAt: new Date().toISOString()
+                };
+                
+                events.push(recurringEvent);
+            }
+        } else if (baseEvent.recurrenceType === 'monthly') {
+            // Generate events for 12 consecutive months
+            for (let monthOffset = 0; monthOffset < 12; monthOffset++) {
+                const recurringDate = new Date(baseDate);
+                recurringDate.setMonth(baseDate.getMonth() + monthOffset);
+                
+                // Handle month overflow (e.g., Jan 31 -> Feb 28/29)
+                if (recurringDate.getDate() !== baseDate.getDate()) {
+                    // Set to last day of the month if original date doesn't exist
+                    recurringDate.setDate(0);
+                }
+                
+                const monthName = recurringDate.toLocaleDateString('en-US', { month: 'short' });
+                const year = recurringDate.getFullYear();
+                
+                const recurringEvent = {
+                    ...baseEvent,
+                    id: this.generateId(),
+                    date: this.formatDateForInput(recurringDate),
+                    title: baseEvent.title + (monthOffset > 0 ? ` (${monthName} ${year})` : ''),
+                    isRecurring: true,
+                    parentEventId: baseEvent.id,
+                    createdAt: new Date().toISOString()
+                };
+                
+                events.push(recurringEvent);
+            }
         }
         
         return events;
@@ -1457,7 +1508,7 @@ class CalendarApp {
                 };
 
                 // If this is a recurring event, generate multiple instances
-                if (cleanedEvent.isRecurring && cleanedEvent.recurrenceType === 'annual') {
+                if (cleanedEvent.isRecurring && (cleanedEvent.recurrenceType === 'annual' || cleanedEvent.recurrenceType === 'monthly')) {
                     const recurringEvents = this.generateRecurringEvents(cleanedEvent);
                     finalEvents.push(...recurringEvents);
                 } else {
@@ -1804,6 +1855,10 @@ class CalendarApp {
             errors.push('isRecurring must be a boolean');
         }
         
+        if (eventData.recurrenceType && !['annual', 'monthly'].includes(eventData.recurrenceType)) {
+            errors.push('recurrenceType must be either "annual" or "monthly"');
+        }
+        
         return {
             isValid: errors.length === 0,
             errors: errors
@@ -1958,10 +2013,10 @@ const EventStructure = {
     title: 'Event Title',
     date: 'YYYY-MM-DD',
     time: 'HH:MM', // optional
-    category: 'birthday|special|holiday|personal|event',
+    category: 'birthday|entertainment|holiday|personal|crypto|expense',
     description: 'Optional description',
     isRecurring: false,
-    recurrenceType: 'annual', // optional
+    recurrenceType: 'annual|monthly', // optional
     createdAt: 'timestamp',
     updatedAt: 'timestamp'
 };
