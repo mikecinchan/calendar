@@ -87,6 +87,17 @@
         </main>
 
         <aside class="sidebar">
+            <!-- Selected Date Events Section -->
+            <div id="selectedDateSection" class="selected-date-section" style="display: none;">
+                <div class="selected-date-header">
+                    <h3 id="selectedDateTitle">Events for Selected Date</h3>
+                    <button id="closeSelectedDate" class="close-btn">&times;</button>
+                </div>
+                <div id="selectedDateEvents" class="selected-date-events">
+                    <!-- Selected date events will be rendered here -->
+                </div>
+            </div>
+
             <div class="event-form">
                 <h3 id="formTitle">Add Event</h3>
                 <form id="eventForm">

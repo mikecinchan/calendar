@@ -210,6 +210,11 @@ class CalendarApp {
             this.toggleRecurrenceOptions(e.target.checked);
         });
 
+        // Selected date events close button
+        document.getElementById('closeSelectedDate').addEventListener('click', () => {
+            this.hideSelectedDateEvents();
+        });
+
         // Enhanced filter controls
         document.getElementById('categoryFilter').addEventListener('change', (e) => {
             this.updateCategoryFilter(e.target.value);
@@ -459,6 +464,9 @@ class CalendarApp {
         
         document.getElementById('eventDate').value = dateString;
         
+        // Show events for selected date
+        this.showSelectedDateEvents(date);
+        
         // Re-render to show selection
         this.renderCalendar();
     }
@@ -545,7 +553,22 @@ class CalendarApp {
             const moreElement = document.createElement('div');
             moreElement.className = 'more-events';
             moreElement.textContent = `+${remainingCount} more`;
-            moreElement.title = `${remainingCount} additional event${remainingCount > 1 ? 's' : ''}`;
+            moreElement.title = `Click to view all ${remainingCount + maxEvents} events for this date`;
+            
+            // Make the "more events" clickable to show selected date events
+            moreElement.style.cursor = 'pointer';
+            moreElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Extract date from the day element
+                const dayElement = eventsContainer.closest('.calendar-day');
+                const dayNumber = dayElement.querySelector('.day-number');
+                if (dayNumber) {
+                    const day = parseInt(dayNumber.textContent);
+                    const date = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), day);
+                    this.selectDate(date);
+                }
+            });
+            
             eventsContainer.appendChild(moreElement);
         }
     }
@@ -833,6 +856,108 @@ class CalendarApp {
         }
     }
 
+    showSelectedDateEvents(date) {
+        const section = document.getElementById('selectedDateSection');
+        const title = document.getElementById('selectedDateTitle');
+        const container = document.getElementById('selectedDateEvents');
+        
+        // Get events for the selected date
+        const events = this.getEventsForDate(date.getFullYear(), date.getMonth(), date.getDate());
+        
+        // Update title with formatted date
+        const formattedDate = date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        title.textContent = `Events for ${formattedDate}`;
+        
+        // Render events
+        this.renderSelectedDateEvents(container, events);
+        
+        // Show the section
+        section.style.display = 'block';
+        
+        // Hide event form on mobile when showing date events
+        if (window.innerWidth <= 768) {
+            const eventForm = document.querySelector('.event-form');
+            eventForm.style.display = 'none';
+        }
+        
+        // Scroll the section into view, especially helpful on mobile
+        setTimeout(() => {
+            section.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        }, 100);
+    }
+
+    hideSelectedDateEvents() {
+        const section = document.getElementById('selectedDateSection');
+        section.style.display = 'none';
+        
+        // Show event form again on mobile
+        if (window.innerWidth <= 768) {
+            const eventForm = document.querySelector('.event-form');
+            eventForm.style.display = 'block';
+        }
+    }
+
+    renderSelectedDateEvents(container, events) {
+        container.innerHTML = '';
+        
+        if (events.length === 0) {
+            const noEventsMsg = document.createElement('div');
+            noEventsMsg.className = 'no-events-message';
+            noEventsMsg.innerHTML = `
+                <p>No events on this date</p>
+                <small>Click below to add an event for this date</small>
+            `;
+            container.appendChild(noEventsMsg);
+            return;
+        }
+        
+        events.forEach(event => {
+            const eventElement = document.createElement('div');
+            eventElement.className = `selected-date-event event-${event.category}`;
+            
+            let eventHTML = `
+                <div class="event-header">
+                    <div class="event-title">${event.title}</div>
+                    <div class="event-actions-mini">
+                        <button onclick="calendar.editEvent('${event.id}')" class="edit-btn-mini">✏️</button>
+                        <button onclick="calendar.deleteEvent('${event.id}')" class="delete-btn-mini">🗑️</button>
+                    </div>
+                </div>
+            `;
+            
+            // Add time if present
+            if (event.time) {
+                eventHTML += `<div class="event-time">🕐 ${event.time}</div>`;
+            }
+            
+            // Add category
+            const categoryDisplay = this.getCategoryDisplayName(event.category);
+            eventHTML += `<div class="event-category">${categoryDisplay}</div>`;
+            
+            // Add description if present
+            if (event.description) {
+                eventHTML += `<div class="event-description">📝 ${event.description}</div>`;
+            }
+            
+            // Add recurring indicator
+            if (event.isRecurring) {
+                const recurrenceText = event.recurrenceType === 'monthly' ? 'monthly' : 'annually';
+                eventHTML += `<div class="event-recurring">🔁 Recurring ${recurrenceText}</div>`;
+            }
+            
+            eventElement.innerHTML = eventHTML;
+            container.appendChild(eventElement);
+        });
+    }
+
     clearForm() {
         document.getElementById('eventForm').reset();
         document.getElementById('editingEventId').value = '';
@@ -848,6 +973,9 @@ class CalendarApp {
     editEvent(eventId) {
         const event = this.events.find(e => e.id === eventId);
         if (!event) return;
+
+        // Hide selected date events section when editing
+        this.hideSelectedDateEvents();
 
         // Populate form with event data
         document.getElementById('eventTitle').value = event.title;
