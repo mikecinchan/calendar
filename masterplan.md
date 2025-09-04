@@ -29,10 +29,11 @@
 ### 2. Event Categories
 - **Default Categories:**
   - Birthday
-  - Special Occasion
+  - Entertainment
   - Holiday
   - Personal
-  - Event
+  - Crypto
+  - Expense
 - **Visual Indicators:** Each category will have distinct colors
 - **Extensibility:** Additional categories can be added later
 
@@ -91,7 +92,7 @@
       "title": "Event Title",
       "date": "YYYY-MM-DD",
       "time": "HH:MM",
-      "category": "Birthday|Special Occasion|Holiday|Personal|Event",
+      "category": "Birthday|Entertainment|Holiday|Personal|Crypto|Expense",
       "description": "Optional description",
       "isRecurring": true|false,
       "recurrenceType": "annual",

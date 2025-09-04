@@ -43,10 +43,11 @@ This document outlines the 6-phase development approach for the My Calendar proj
 - [ ] Implement Delete events functionality
 - [ ] Add event categories system with color coding
   - Birthday (color assignment)
-  - Special Occasion (color assignment)
+  - Entertainment (color assignment)
   - Holiday (color assignment)
   - Personal (color assignment)
-  - Event (color assignment)
+  - Crypto (color assignment)
+  - Expense (color assignment)
 - [ ] Firebase data persistence for all CRUD operations
 - [ ] Basic event display on calendar grid
 

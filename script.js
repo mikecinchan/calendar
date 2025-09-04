@@ -1247,10 +1247,11 @@ class CalendarApp {
     getCategoryDisplayName(category) {
         const categories = {
             'birthday': '🎂 Birthday',
-            'special': '✨ Special Occasion',
+            'entertainment': '🎭 Entertainment',
             'holiday': '🎉 Holiday',
             'personal': '👤 Personal',
-            'event': '📅 Event'
+            'crypto': '₿ Crypto',
+            'expense': '💰 Expense'
         };
         return categories[category] || category;
     }
@@ -1783,7 +1784,7 @@ class CalendarApp {
             }
         }
         
-        const validCategories = ['birthday', 'special', 'holiday', 'personal', 'event'];
+        const validCategories = ['birthday', 'entertainment', 'holiday', 'personal', 'crypto', 'expense'];
         if (!eventData.category || !validCategories.includes(eventData.category)) {
             errors.push(`Category must be one of: ${validCategories.join(', ')}`);
         }
